@@ -1,0 +1,107 @@
+\input texinfo   @c -*-texinfo-*-
+
+@setfilename wwwlite.info
+@settitle WWWLite
+
+@contents
+
+@node Top
+@top WWWLite
+
+A lightweight web browser.
+
+@menu
+* Implementation::     Development documentation
+@end menu
+
+@node Implementation
+@chapter Implementation
+
+This chapter describes the reasoning behind design and technology
+choices, and the overall architecture.
+
+GTK+ is used because it is a widely available and well-maintained GUI
+toolkit, and Pango is its related project. Pango is used because complex
+text rendering respecting system-wide settings is desired, and Pango
+does just that, while also being easily available and well-maintained.
+Libsoup and libxml2 are chosen for similar reasons. In case if it will
+be desired to migrate from any of those libraries, or to support
+alternative ones, they would still provide a useful scaffolding for the
+time being.
+
+GTK's standard widgets do not include everything needed for an HTML
+document viewer. Most notably, HTML ``phrasing content'' allows texts to
+be mixed with hyperlinks, images, and various input elements, and it is
+expected that text selection would work across such elements. To achieve
+that, the @code{InlineBox} widget is implemented as a basic building
+block: it is a container widget that can contain texts and other
+elements, implementing word wrapping, link focus, selection rendering.
+Another important custom widget is @code{DocumentBox}, which manages
+selection (and similar tasks, such as handling of link clicks) across
+all the @code{InlineBox} widgets inside of it. A wrapper around that one
+is @code{BrowserBox}, which combines it with an address bar and a status
+bar, manages document loading and UI building. The latter is placed
+directly into main window's tabs.
+
+More on individual components is in the following sections.
+
+@section InlineBox
+
+An @code{InlineBox} can have children of 3 types: texts (the
+@code{IBText} object), line breaks (@code{IBBreak}), and regular GTK
+widgets (e.g., images, input fields). While texts and line breaks could
+be widgets too, tens or hundreds of thousands of widgets cause a GTK
+application to lag. Regular C structures could be used instead, but
+@code{GObject} objects are used because they already provide a way to
+distinguish between structure types, with no need for an additional
+wrapper.
+
+Line breaks are implemented as @code{InlineBox} children, since they can
+be inside a link (or a markup element), which would be more cumbersome
+to manage if it was spread across multiple @code{InlineBox} elements,
+and @code{InlineBox} better matches ``phrasing content'' semantics this
+way.
+
+@code{IBText} structures contain an allocation and reference a Pango
+layout of a single word, facilitating word caching. Whitespaces are
+handled as regular words, since they can vary in size and other text
+properties.
+
+@section TableBox
+
+@code{TableBox} is used for HTML tables, and @code{TableCell} is a
+subtype of @code{BlockBox}, which adds @var{colspan} and @var{rowspan}
+properties.
+
+@code{TableBox}'s @code{rows} correspond to HTML @code{tr} elements,
+each row contains a list of @code{TableCell} elements, corresponding to
+HTML @code{td} or @code{th}.
+
+@c TODO: document the algorithm.
+
+@section BlockBox
+
+@code{BlockBox} is a subtype of @code{GtkBox}. It only sets orientation
+to vertical, and the ``height for width'' GTK request mode instead of
+applying the default @code{GtkContainer} heuristics to determine that.
+
+@section DocumentBox
+
+@code{DocumentBox} is responsible for scrolling, link clicks, text
+selection management.
+
+@section BrowserBox
+
+@code{BrowserBox} combines an address bar, a @code{DocumentBox}, and a
+status bar. It also carries @code{BuilderState} and @code{SoupSession}.
+It is intended to be used for browser tabs, while on its own it
+implements a non-tabbed browser.
+
+@c TODO: describe UI building
+
+@section Main window
+
+The main window contains tabs, and tab management events are handled in
+@code{main.c}.
+
+@bye

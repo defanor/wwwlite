@@ -1,0 +1,18 @@
+WWWLite, a lightweight web browser.
+
+Hypertext documents are targeted, without per-document styling or
+executable scripts.
+
+Widely available and well-maintained tools are used, aiming a good
+system integration and easy building. System-wide colour and font
+settings are respected, parsing and UI building are incremental, image
+loading is asynchronous, word cache is used.
+
+At this stage it is rather a proof of concept: many features are
+implemented just to the point where it is apparent that they will not
+require major design changes to complete; there is not much of error
+handling or optimisation, no configuration. Though it is already
+capable of rendering and navigating HTML documents.
+
+A screenshot is available at
+<https://defanor.uberspace.net/pictures/wwwlite.png>.

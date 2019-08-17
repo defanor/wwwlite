@@ -1,0 +1,12 @@
+                                                         -*- outline -*-
+
+* 2019-08-17, a more complete prototype
+  At about 3 KLOC, now there is (rudimentary) support for tables with
+  colspans and rowspans, form submission, tabs, history navigation.
+
+* 2019-07-18, a prototype
+  At about 2000 lines it includes word wrapping and caching, clickable
+  and focusable links, text selection, inline GTK widgets mixed with
+  texts, streaming parsing and UI building, asynchronous image
+  loading. Handled HTML elements include h1-h6, p, a, br, img, pre,
+  ul, li, dl, dt, dd, input, sub, sup, code, i, em, b, strong.
