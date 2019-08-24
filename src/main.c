@@ -41,19 +41,70 @@ key_press_event_cb (GtkWidget *widget, GdkEventKey *ev, GtkStack *tabs)
       return TRUE;
     } else if (ev->keyval == GDK_KEY_w) {
       GtkWidget *current_tab = gtk_stack_get_visible_child(tabs);
-      if (current_tab) {
+      if (current_tab != NULL) {
         gtk_widget_destroy(current_tab);
+        return TRUE;
       }
-      return TRUE;
+    } else if (ev->keyval == GDK_KEY_s) {
+      GtkWidget *current_tab = gtk_stack_get_visible_child(tabs);
+      if (current_tab != NULL) {
+        BrowserBox *bb = BROWSER_BOX(current_tab);
+        if (bb->search_state == SEARCH_INACTIVE) {
+          bb->search_state = SEARCH_FORWARD;
+          browser_box_display_search_status(bb);
+        } else if (bb->search_state == SEARCH_FORWARD) {
+          TextSearchState *tss = &(DOCUMENT_BOX(bb->builder_state->docbox)->search);
+          if (tss->state == FOUND) {
+            tss->start++;
+          }
+          document_box_find(DOCUMENT_BOX(bb->builder_state->docbox), bb->search_string);
+          browser_box_display_search_status(bb);
+        }
+        return TRUE;
+      }
+    } else if (ev->keyval == GDK_KEY_g) {
+      GtkWidget *current_tab = gtk_stack_get_visible_child(tabs);
+      if (current_tab != NULL) {
+        BrowserBox *bb = BROWSER_BOX(current_tab);
+        if (bb->search_state != SEARCH_INACTIVE) {
+          bb->search_state = SEARCH_INACTIVE;
+          bb->search_string[0] = 0;
+          browser_box_set_status(bb, "Interrupted");
+        }
+      }
     }
   }
   GtkWidget *current_tab = gtk_stack_get_visible_child(tabs);
   if (current_tab != NULL) {
     BrowserBox *bb = BROWSER_BOX(current_tab);
-    if (ev->keyval == GDK_KEY_Back || ev->keyval == GDK_KEY_BackSpace) {
+    if (ev->keyval == GDK_KEY_Back ||
+        (bb->search_state == SEARCH_INACTIVE &&
+         ev->keyval == GDK_KEY_BackSpace)) {
       return history_back(bb);
     } else if (ev->keyval == GDK_KEY_Forward) {
       return history_forward(bb);
+    } else if (bb->search_state != SEARCH_INACTIVE &&
+               bb->builder_state != NULL &&
+               bb->builder_state->docbox != NULL) {
+      size_t ss_len = strlen(bb->search_string);
+      DocumentBox *db = DOCUMENT_BOX(bb->builder_state->docbox);
+      if (ev->keyval == GDK_KEY_BackSpace && ss_len > 0) {
+        /* todo: this won't work well for unicode */
+        bb->search_string[ss_len - 1] = 0;
+        document_box_find(db, bb->search_string);
+        browser_box_display_search_status(bb);
+        return TRUE;
+      }
+      if (ss_len + 4 < MAX_SEARCH_STRING_LEN) {
+        gunichar c = gdk_keyval_to_unicode(ev->keyval);
+        gint c_len = g_unichar_to_utf8(c, bb->search_string + ss_len);
+        if (c_len > 0) {
+          bb->search_string[ss_len + c_len] = 0;
+          browser_box_display_search_status(bb);
+          document_box_find(db, bb->search_string);
+          return TRUE;
+        }
+      }
     }
   }
   return FALSE;

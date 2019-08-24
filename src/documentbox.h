@@ -46,14 +46,32 @@ struct _SelectionState
   gboolean selecting;
 };
 
+typedef enum _TSState TSState;
+enum _TSState {
+  START,
+  LOOKING,
+  FOUND
+};
+
+typedef struct _TextSearchState TextSearchState;
+struct _TextSearchState
+{
+  InlineBox *ib;
+  gint start;
+  gint end;
+  const gchar *str;
+  gboolean forward;
+  TSState state;
+};
+
 struct _DocumentBox
 {
   GtkScrolledWindow parent_instance;
   GtkEventBox *evbox;
   GList *links;
   SelectionState sel;
+  TextSearchState search;
   GdkWindow *event_window;
-  /* GList *forms; */
 };
 
 struct _DocumentBoxClass
@@ -63,7 +81,7 @@ struct _DocumentBoxClass
 
 GType document_box_get_type(void) G_GNUC_CONST;
 DocumentBox *document_box_new(void);
-
+gboolean document_box_find (DocumentBox *db, const gchar *str);
 
 G_END_DECLS
 

@@ -89,6 +89,15 @@ struct _BuilderState
 typedef struct _BrowserBox BrowserBox;
 typedef struct _BrowserBoxClass BrowserBoxClass;
 
+typedef enum _BTSState BTSState;
+enum _BTSState {
+  SEARCH_INACTIVE,
+  SEARCH_FORWARD,
+  SEARCH_BACKWARD
+};
+
+#define MAX_SEARCH_STRING_LEN 512
+
 struct _BrowserBox
 {
   BlockBox parent_instance;
@@ -100,6 +109,8 @@ struct _BrowserBox
   GList *forms;
   GList *history;
   GList *history_position;
+  BTSState search_state;
+  gchar search_string[MAX_SEARCH_STRING_LEN + 1];
   GtkStack *tabs;
   /* GHashTable *word_cache; */
 };
@@ -125,6 +136,8 @@ void document_request_sm (BrowserBox *bb, SoupMessage *sm);
 void document_request (BrowserBox *bb, SoupURI *uri);
 gboolean history_back (BrowserBox *bb);
 gboolean history_forward (BrowserBox *bb);
+void browser_box_set_status(BrowserBox *bb, const gchar *status_str);
+void browser_box_display_search_status (BrowserBox *bb);
 
 GHashTable *word_cache;
 

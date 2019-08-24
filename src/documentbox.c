@@ -95,6 +95,12 @@ static void
 document_box_init (DocumentBox *db)
 {
   db->links = NULL;
+  db->search.ib = NULL;
+  db->search.start = 0;
+  db->search.end = -1;
+  db->search.str = NULL;
+  db->search.forward = TRUE;
+  db->search.state = START;
 }
 
 
@@ -486,4 +492,61 @@ DocumentBox *document_box_new ()
   db->links = NULL;
   db->sel.selection_active = FALSE;
   return db;
+}
+
+static void
+document_box_search (GtkWidget *widget, TextSearchState *tss) {
+  /* todo: backwards search */
+  if (tss->state == FOUND) {
+    return;
+  }
+  if (tss->state == START && (tss->ib == NULL || GTK_WIDGET(tss->ib) == widget)) {
+    /* No previous position or found the widget */
+    tss->state = LOOKING;
+    if (tss->ib != NULL) {
+      tss->ib->match_start = 0;
+      tss->ib->match_end = 0;
+      gtk_widget_queue_draw(GTK_WIDGET(tss->ib));
+    }
+  }
+  if (tss->state == LOOKING &&
+      (tss->ib == NULL || GTK_WIDGET(tss->ib) != widget)) {
+    tss->start = 0;
+    tss->end = -1;
+  }
+  if (tss->state == LOOKING && IS_INLINE_BOX(widget)) {
+    InlineBox *ib = INLINE_BOX(widget);
+    gint pos = inline_box_search(ib, tss->start, tss->end, tss->str);
+    if (pos != -1) {
+      tss->state = FOUND;
+      tss->ib = ib;
+      tss->start = pos;
+      tss->end = pos + strlen(tss->str);
+      ib->match_start = tss->start;
+      ib->match_end = tss->end;
+      gtk_widget_queue_draw(widget);
+    }
+  } else if (tss->state != FOUND && GTK_IS_CONTAINER(widget)) {
+    gtk_container_foreach(GTK_CONTAINER(widget),
+                          (GtkCallback)document_box_search, tss);
+  }
+}
+
+gboolean
+document_box_find (DocumentBox *db, const gchar *str)
+{
+  /* todo: backwards search */
+  db->search.str = str;
+  db->search.state = START;
+  db->search.end = -1;
+  document_box_search(GTK_WIDGET(db), &(db->search));
+  if (db->search.state == FOUND) {
+    gtk_widget_grab_focus(GTK_WIDGET(db->search.ib));
+    return TRUE;
+  } else {
+    db->search.ib = NULL;
+    db->search.start = 0;
+    db->search.end = -1;
+    return FALSE;
+  }
 }

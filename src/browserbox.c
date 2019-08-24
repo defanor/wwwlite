@@ -118,26 +118,46 @@ static void builder_state_class_init (BuilderStateClass *klass)
   object_class->dispose = builder_state_dispose;
 }
 
+void scroll_to (BuilderState *bs, GObject *target)
+{
+  GtkAllocation widget_alloc, *alloc;
+  if (GTK_IS_WIDGET(target)) {
+    gtk_widget_get_allocation(GTK_WIDGET(target), &widget_alloc);
+    alloc = &widget_alloc;
+  } else if (IS_IB_TEXT(target)) {
+    alloc = &IB_TEXT(target)->alloc;
+  } else {
+    puts("Shouldn't happen");
+    return;
+  }
+  GtkAdjustment *adj =
+    gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(bs->docbox));
+  gtk_adjustment_set_value(adj, alloc->y);
+  gtk_scrolled_window_set_vadjustment(GTK_SCROLLED_WINDOW(bs->docbox),
+                                      adj);
+}
 
 void scroll_to_identifier(BuilderState *bs, const char *identifier)
 {
-  GtkWidget *target = g_hash_table_lookup(bs->identifiers, identifier);
-  if (target) {
-    GtkAllocation widget_alloc, *alloc;
-    if (GTK_IS_WIDGET(target)) {
-      gtk_widget_get_allocation(target, &widget_alloc);
-      alloc = &widget_alloc;
-    } else if (IS_IB_TEXT(target)) {
-      alloc = &IB_TEXT(target)->alloc;
-    } else {
-      puts("Shouldn't happen");
-      return;
-    }
-    GtkAdjustment *adj =
-      gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(bs->docbox));
-    gtk_adjustment_set_value(adj, alloc->y);
-    gtk_scrolled_window_set_vadjustment(GTK_SCROLLED_WINDOW(bs->docbox),
-                                        adj);
+  GObject *target = g_hash_table_lookup(bs->identifiers, identifier);
+  if (target != NULL) {
+    scroll_to(bs, target);
+  }
+}
+
+void browser_box_set_status(BrowserBox *bb, const gchar *status_str) {
+  gtk_statusbar_remove_all(GTK_STATUSBAR(bb->status_bar),
+                           gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"));
+  gtk_statusbar_push(GTK_STATUSBAR(bb->status_bar),
+                     gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"),
+                     status_str);
+}
+
+void browser_box_display_search_status (BrowserBox *bb) {
+  gchar status[MAX_SEARCH_STRING_LEN + 33];
+  if (bb->search_state == SEARCH_FORWARD) {
+    sprintf(status, "Forward search: %s", bb->search_string);
+    browser_box_set_status(bb, status);
   }
 }
 
@@ -1212,11 +1232,7 @@ void hover_link_cb (void *ptr,
                     gchar *url,
                     BrowserBox *bb)
 {
-  gtk_statusbar_remove_all(GTK_STATUSBAR(bb->status_bar),
-                           gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"));
-  gtk_statusbar_push(GTK_STATUSBAR(bb->status_bar),
-                     gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"),
-                     url);
+  browser_box_set_status(bb, url);
 }
 
 
@@ -1238,11 +1254,7 @@ void document_loaded(SoupSession *session,
   htmlParseChunk(bs->parser, "", 0, 1);
   gtk_widget_grab_focus(GTK_WIDGET(bs->docbox));
   printf("word cache: %u\n", g_hash_table_size(word_cache));
-  gtk_statusbar_remove_all(GTK_STATUSBAR(bb->status_bar),
-                           gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"));
-  gtk_statusbar_push(GTK_STATUSBAR(bb->status_bar),
-                     gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"),
-                     "Ready");
+  browser_box_set_status(bb, "Ready");
 }
 
 void got_chunk(SoupMessage *msg,
@@ -1251,11 +1263,7 @@ void got_chunk(SoupMessage *msg,
 {
   BrowserBox *bb = ptr;
   BuilderState *bs = bb->builder_state;
-  gtk_statusbar_remove_all(GTK_STATUSBAR(bb->status_bar),
-                           gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"));
-  gtk_statusbar_push(GTK_STATUSBAR(bb->status_bar),
-                     gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"),
-                     "Loading");
+  browser_box_set_status(bb, "Loading");
   if (bs->parser == NULL) {
     /* todo: maybe move it into got_headers */
     char *uri_str = soup_uri_to_string(bs->uri, FALSE);
@@ -1285,11 +1293,7 @@ void got_chunk(SoupMessage *msg,
 void got_headers(SoupMessage *msg, gpointer ptr)
 {
   BrowserBox *bb = ptr;
-  gtk_statusbar_remove_all(GTK_STATUSBAR(bb->status_bar),
-                           gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"));
-  gtk_statusbar_push(GTK_STATUSBAR(bb->status_bar),
-                     gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"),
-                     "Got headers");
+  browser_box_set_status(bb, "Got headers");
   /* todo: check content type, don't assume HTML */
   if (bb->builder_state != NULL) {
     if (bb->builder_state->docbox != NULL) {
@@ -1306,11 +1310,7 @@ void got_headers(SoupMessage *msg, gpointer ptr)
 
 void document_request_sm (BrowserBox *bb, SoupMessage *sm)
 {
-  gtk_statusbar_remove_all(GTK_STATUSBAR(bb->status_bar),
-                           gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"));
-  gtk_statusbar_push(GTK_STATUSBAR(bb->status_bar),
-                     gtk_statusbar_get_context_id(GTK_STATUSBAR(bb->status_bar), "status"),
-                     "Requesting");
+  browser_box_set_status(bb, "Requesting");
   if (bb->builder_state != NULL) {
     bb->builder_state->active = FALSE;
   }
@@ -1394,6 +1394,7 @@ browser_box_init (BrowserBox *bb)
   bb->forms = NULL;
   bb->history = NULL;
   bb->history_position = NULL;
+  bb->search_string[0] = 0;
   return;
 }
 

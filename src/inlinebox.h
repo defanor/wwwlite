@@ -101,6 +101,8 @@ struct _InlineBox
   GObject *focused_object;
   guint selection_start;
   guint selection_end;
+  guint match_start;
+  guint match_end;
   gboolean wrap;
 };
 
@@ -109,10 +111,12 @@ struct _InlineBoxClass
   GtkContainerClass parent_class;
 };
 
-GType inline_box_get_type(void) G_GNUC_CONST;
-InlineBox *inline_box_new(void);
-void inline_box_add_text(InlineBox *container, IBText *text);
-void inline_box_break(InlineBox *container);
+GType inline_box_get_type (void) G_GNUC_CONST;
+InlineBox *inline_box_new (void);
+void inline_box_add_text (InlineBox *container, IBText *text);
+void inline_box_break (InlineBox *container);
+gchar *inline_box_get_text (InlineBox *ib);
+gint inline_box_search (InlineBox *ib, guint start, gint end, const gchar *str);
 
 G_END_DECLS
 

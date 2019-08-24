@@ -165,6 +165,29 @@ inline_box_draw (GtkWidget *widget,
                               sel_width, ibt->alloc.height);
         gtk_style_context_remove_class(styleCtx, "rubberband");
       }
+      /* duplication here (todo) */
+      if (ib->match_start <= text_position + text_len &&
+          ib->match_end >= text_position) {
+        guint sel_start = ibt->alloc.x, sel_width = ibt->alloc.width;
+        gint x_pos;
+        if (ib->match_start > text_position) {
+          pango_layout_index_to_line_x(ibt->layout,
+                                       ib->match_start - text_position,
+                                       FALSE, NULL, &x_pos);
+          sel_start += x_pos / PANGO_SCALE;
+          sel_width -= x_pos / PANGO_SCALE;
+        }
+        if (ib->match_end < text_position + text_len) {
+          pango_layout_index_to_line_x(ibt->layout,
+                                       ib->match_end - text_position,
+                                       FALSE, NULL, &x_pos);
+          sel_width -= ibt->alloc.width - x_pos / PANGO_SCALE;
+        }
+        gtk_style_context_add_class(styleCtx, "rubberband");
+        gtk_render_background(styleCtx, cr, sel_start, ibt->alloc.y,
+                              sel_width, ibt->alloc.height);
+        gtk_style_context_remove_class(styleCtx, "rubberband");
+      }
 
       gtk_render_layout(styleCtx, cr, ibt->alloc.x, ibt->alloc.y, ibt->layout);
 
@@ -582,4 +605,41 @@ inline_box_forall (GtkContainer *container, gboolean include_internals,
     }
     child = next;
   }
+}
+
+gchar*
+inline_box_get_text (InlineBox *ib)
+{
+  GList *child;
+  gchar **words = calloc(g_list_length(ib->children) + 1, sizeof(gchar*));
+  guint n = 0;
+  for (child = ib->children; child; child = child->next) {
+    if (IS_IB_TEXT(child->data)) {
+      words[n] = (gchar*)pango_layout_get_text(IB_TEXT(child->data)->layout);
+      n++;
+    }
+  }
+  gchar *result = g_strjoinv(NULL, words);
+  free(words);
+  return result;
+}
+
+gint
+inline_box_search (InlineBox *ib,
+                   guint start,
+                   gint end,
+                   const gchar *str)
+{
+  gchar *orig_text = inline_box_get_text(ib);
+  gchar *text = g_utf8_strdown(orig_text, -1);
+  g_free(orig_text);
+  if (end != -1) {
+    end -= start;
+  }
+  gchar *result = g_strstr_len(text + start, end, str);
+  g_free(text);
+  if (result != NULL) {
+    return result - text;
+  }
+  return -1;
 }
