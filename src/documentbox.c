@@ -187,58 +187,56 @@ static gint compare_positions(GtkAllocation *a1, guint i1,
   }
 }
 
-
+/* Updates InlineBox widgets to render selection appropriately. */
 static void
 selection_update (GtkWidget *widget, SelectionState *st)
 {
-  GtkAllocation alloc;
+  if (st->selection_start == NULL ||
+      st->selection_end == NULL ||
+      st->selection_prev == NULL) {
+    return;
+  }
+  GtkAllocation alloc, alloc_start, alloc_end, alloc_prev;
   gtk_widget_get_allocation(widget, &alloc);
-  if (widget_is_affected(&alloc, &st->selection_start->alloc,
-                         &st->selection_end->alloc) ||
-      widget_is_affected(&alloc, &st->selection_start->alloc,
-                         &st->selection_prev->alloc) ||
-      widget_is_affected(&alloc, &st->selection_end->alloc,
-                         &st->selection_prev->alloc)) {
+  gtk_widget_get_allocation(GTK_WIDGET(st->selection_start), &alloc_start);
+  gtk_widget_get_allocation(GTK_WIDGET(st->selection_end), &alloc_end);
+  gtk_widget_get_allocation(GTK_WIDGET(st->selection_prev), &alloc_prev);
+  if (widget_is_affected(&alloc, &alloc_start, &alloc_end) ||
+      widget_is_affected(&alloc, &alloc_start, &alloc_prev) ||
+      widget_is_affected(&alloc, &alloc_end, &alloc_prev)) {
     if (IS_INLINE_BOX(widget)) {
       InlineBox *ib = INLINE_BOX(widget);
       ib->selection_end = 0;
       ib->selection_start = 0;
-      GList *ti;
-      guint text_position = 0;
-
-      for (ti = ib->children; ti; ti = ti->next) {
-        if (IS_IB_TEXT(ti->data)) {
-          IBText *ibt = IB_TEXT(ti->data);
-          gint direction = compare_positions(&st->selection_start->alloc,
-                                     st->selection_start_index,
-                                     &st->selection_end->alloc,
-                                     st->selection_end_index);
-          if (direction == -1) {
-            if (st->selection_start == ibt) {
-              ib->selection_start = st->selection_start_index + text_position;
-              st->selecting = TRUE;
-            }
-            if (st->selecting && st->selection_end == ibt) {
-              ib->selection_end = st->selection_end_index + text_position;
-              st->selecting = FALSE;
-            }
-          } else if (direction == 1) {
-            if (st->selection_end == ibt) {
-              ib->selection_start = st->selection_end_index + text_position;
-              st->selecting = TRUE;
-            }
-            if (st->selecting && st->selection_start == ibt) {
-              ib->selection_end = st->selection_start_index + text_position;
-              st->selecting = FALSE;
-            }
-          }
-          text_position += strlen(pango_layout_get_text(ibt->layout));
-          gtk_widget_queue_draw (widget);
+      gint direction = compare_positions(&alloc_start,
+                                         st->selection_start_index,
+                                         &alloc_end,
+                                         st->selection_end_index);
+      if (direction == -1) {
+        if (st->selection_start == ib) {
+          ib->selection_start = st->selection_start_index;
+          st->selecting = TRUE;
+        }
+        if (st->selecting && st->selection_end == ib) {
+          ib->selection_end = st->selection_end_index;
+          st->selecting = FALSE;
+        }
+      } else if (direction == 1) {
+        if (st->selection_end == ib) {
+          ib->selection_start = st->selection_end_index;
+          st->selecting = TRUE;
+        }
+        if (st->selecting && st->selection_start == ib) {
+          ib->selection_end = st->selection_start_index;
+          st->selecting = FALSE;
         }
       }
+
       if (st->selecting) {
-        ib->selection_end = text_position;
+        ib->selection_end = inline_box_get_text_length(ib);
       }
+
+      gtk_widget_queue_draw (widget);
     } else if (GTK_IS_CONTAINER(widget)) {
       gtk_container_foreach(GTK_CONTAINER(widget),
                             (GtkCallback)selection_update, st);
@@ -352,12 +350,12 @@ button_press_event_cb (GtkWidget      *widget,
     selection_update(widget, &db->sel);
   }
 
-  if (ss.ibt) {
+  if (ss.ib) {
     db->sel.selection_active = TRUE;
-    db->sel.selection_start = ss.ibt;
-    db->sel.selection_start_index = ss.index;
-    db->sel.selection_end = ss.ibt;
-    db->sel.selection_end_index = ss.index;
+    db->sel.selection_start = ss.ib;
+    db->sel.selection_start_index = ss.ib_index;
+    db->sel.selection_end = ss.ib;
+    db->sel.selection_end_index = ss.ib_index;
     /* todo: grab focus when any non-widget space is clicked, not
        just texts */
     gtk_widget_grab_focus(GTK_WIDGET(db));
@@ -380,11 +378,11 @@ motion_notify_event_cb (GtkWidget      *widget,
   ss.x = ev_orig_x - orig_x + event->x;
   ss.y = ev_orig_y - orig_y + event->y;
   text_at_position(widget, &ss);
-  if (ss.ibt && db->sel.selection_active) {
+  if (ss.ib && db->sel.selection_active) {
     db->sel.selection_prev = db->sel.selection_end;
     db->sel.selection_prev_index = db->sel.selection_end_index;
-    db->sel.selection_end = ss.ibt;
-    db->sel.selection_end_index = ss.index;
+    db->sel.selection_end = ss.ib;
+    db->sel.selection_end_index = ss.ib_index;
     db->sel.selecting = FALSE;
     selection_update(widget, &db->sel);
   }
@@ -495,51 +493,61 @@ DocumentBox *document_box_new ()
 }
 
 static void
-document_box_search (GtkWidget *widget, TextSearchState *tss) {
+document_box_search (GtkWidget *widget, DocumentBox *db) {
   /* todo: backwards search */
-  if (tss->state == FOUND) {
+  if (db->search.state == FOUND) {
     return;
   }
-  if (tss->state == START && (tss->ib == NULL || GTK_WIDGET(tss->ib) == widget)) {
+  if (db->search.state == START &&
+      (db->search.ib == NULL || GTK_WIDGET(db->search.ib) == widget)) {
     /* No previous position or found the widget */
-    tss->state = LOOKING;
-    if (tss->ib != NULL) {
-      tss->ib->match_start = 0;
-      tss->ib->match_end = 0;
-      gtk_widget_queue_draw(GTK_WIDGET(tss->ib));
+    db->search.state = LOOKING;
+    if (db->search.ib != NULL) {
+      db->sel.selection_prev = db->search.ib;
     }
   }
-  if (tss->state == LOOKING &&
-      (tss->ib == NULL || GTK_WIDGET(tss->ib) != widget)) {
-    tss->start = 0;
-    tss->end = -1;
+  if (db->search.state == LOOKING &&
+      (db->search.ib == NULL || GTK_WIDGET(db->search.ib) != widget)) {
+    db->search.start = 0;
+    db->search.end = -1;
   }
-  if (tss->state == LOOKING && IS_INLINE_BOX(widget)) {
+  if (db->search.state == LOOKING && IS_INLINE_BOX(widget)) {
     InlineBox *ib = INLINE_BOX(widget);
-    gint pos = inline_box_search(ib, tss->start, tss->end, tss->str);
+    gint pos = inline_box_search(ib, db->search.start, db->search.end, db->search.str);
     if (pos != -1) {
-      tss->state = FOUND;
-      tss->ib = ib;
-      tss->start = pos;
-      tss->end = pos + strlen(tss->str);
-      ib->match_start = tss->start;
-      ib->match_end = tss->end;
+      db->search.state = FOUND;
+      db->search.ib = ib;
+      db->search.start = pos;
+      db->search.end = pos + strlen(db->search.str);
+
+      db->sel.selection_start = db->search.ib;
+      db->sel.selection_start_index = db->search.start;
+      db->sel.selection_end = db->search.ib;
+      db->sel.selection_end_index = db->search.end;
+      selection_update(widget, &db->sel);
       gtk_widget_queue_draw(widget);
     }
-  } else if (tss->state != FOUND && GTK_IS_CONTAINER(widget)) {
+  } else if (db->search.state != FOUND && GTK_IS_CONTAINER(widget)) {
     gtk_container_foreach(GTK_CONTAINER(widget),
-                          (GtkCallback)document_box_search, tss);
+                          (GtkCallback)document_box_search, db);
   }
 }
 
 gboolean
 document_box_find (DocumentBox *db, const gchar *str)
 {
+  /* Cleanup selection */
+  db->sel.selection_prev = db->sel.selection_end;
+  db->sel.selection_prev_index = db->sel.selection_end_index + 1;
+  db->sel.selection_end = db->sel.selection_start;
+  db->sel.selection_end_index = db->sel.selection_start_index;
+  selection_update(GTK_WIDGET(db), &db->sel);
+
   /* todo: backwards search */
   db->search.str = str;
   db->search.state = START;
   db->search.end = -1;
-  document_box_search(GTK_WIDGET(db), &(db->search));
+  document_box_search(GTK_WIDGET(db), db);
   if (db->search.state == FOUND) {
     gtk_widget_grab_focus(GTK_WIDGET(db->search.ib));
     return TRUE;

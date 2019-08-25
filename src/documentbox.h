@@ -36,11 +36,11 @@ typedef struct _DocumentBoxClass DocumentBoxClass;
 typedef struct _SelectionState SelectionState;
 struct _SelectionState
 {
-  IBText *selection_start;
+  InlineBox *selection_start;
   guint selection_start_index;
-  IBText *selection_end;
+  InlineBox *selection_end;
   guint selection_end_index;
-  IBText *selection_prev;
+  InlineBox *selection_prev;
   guint selection_prev_index;
   gboolean selection_active;
   gboolean selecting;
