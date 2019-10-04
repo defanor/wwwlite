@@ -1414,7 +1414,9 @@ BrowserBox *browser_box_new (gchar *uri_str)
 
   bb->docbox_root = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
   gtk_container_add (GTK_CONTAINER(bb), bb->docbox_root);
-  gtk_box_set_child_packing(GTK_BOX(bb), bb->docbox_root, TRUE, TRUE, 0, GTK_PACK_START);
+  gtk_box_set_child_packing(GTK_BOX(bb), bb->docbox_root, TRUE, TRUE,
+                            0, GTK_PACK_START);
+  gtk_container_set_border_width(GTK_CONTAINER(bb->docbox_root), 4);
 
   bb->status_bar = gtk_statusbar_new();
   gtk_container_add (GTK_CONTAINER(bb), bb->status_bar);
