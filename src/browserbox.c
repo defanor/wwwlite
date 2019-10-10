@@ -1248,7 +1248,8 @@ void document_loaded(SoupSession *session,
 {
   BrowserBox *bb = ptr;
   BuilderState *bs = bb->builder_state;
-  if (! bs->active) {
+  if (bs == NULL || bs->active == FALSE) {
+    browser_box_set_status(bb, "Failed to load the document");
     return;
   }
   htmlParseChunk(bs->parser, "", 0, 1);
