@@ -1070,7 +1070,8 @@ void sax_end_element (BrowserBox *bb, const xmlChar *u_name)
       g_slist_free_1(bs->stack);
       bs->stack = next;
     }
-    if (strcmp(name, "ol") == 0 || strcmp(name, "ul") == 0) {
+    if (bs->ol_numbers != NULL &&
+        (strcmp(name, "ol") == 0 || strcmp(name, "ul") == 0)) {
       GSList *next = bs->ol_numbers->next;
       g_free(bs->ol_numbers->data);
       g_slist_free_1(bs->ol_numbers);
