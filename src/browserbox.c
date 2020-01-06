@@ -1296,7 +1296,6 @@ void got_headers(SoupMessage *msg, gpointer ptr)
 {
   BrowserBox *bb = ptr;
   browser_box_set_status(bb, "Got headers");
-  /* todo: check content type, don't assume HTML */
   if (bb->builder_state != NULL) {
     if (bb->builder_state->docbox != NULL) {
       gtk_widget_destroy(GTK_WIDGET(bb->builder_state->docbox));
@@ -1308,6 +1307,18 @@ void got_headers(SoupMessage *msg, gpointer ptr)
   char *uri_str = soup_uri_to_string(bb->builder_state->uri, FALSE);
   gtk_entry_set_text(GTK_ENTRY(bb->address_bar), uri_str);
   free(uri_str);
+
+  SoupMessageHeaders *smh;
+  g_object_get(msg,
+               "response-headers", &smh,
+               NULL);
+  const char *ct = soup_message_headers_get_content_type(smh, NULL);
+  if (! (strcmp(ct, "text/html") == 0 ||
+         strcmp(ct, "application/xhtml+xml") == 0)) {
+    browser_box_set_status(bb, "Unsupported content type");
+    /* todo: offer to download a file */
+    bb->builder_state->active = FALSE;
+  }
 }
 
 void document_request_sm (BrowserBox *bb, SoupMessage *sm)
