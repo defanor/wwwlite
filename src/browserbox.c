@@ -1313,8 +1313,11 @@ void got_headers(SoupMessage *msg, gpointer ptr)
                "response-headers", &smh,
                NULL);
   const char *ct = soup_message_headers_get_content_type(smh, NULL);
-  if (! (strcmp(ct, "text/html") == 0 ||
-         strcmp(ct, "application/xhtml+xml") == 0)) {
+  if (ct == NULL) {
+    browser_box_set_status(bb, "Unknown content type");
+    bb->builder_state->active = FALSE;
+  } else if (! (strcmp(ct, "text/html") == 0 ||
+                strcmp(ct, "application/xhtml+xml") == 0)) {
     browser_box_set_status(bb, "Unsupported content type");
     /* todo: offer to download a file */
     bb->builder_state->active = FALSE;
